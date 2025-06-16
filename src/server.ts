@@ -90,6 +90,10 @@ const chatIO = new Server(chatServer, {
 chatIO.on('connection', (socket) => {
     console.log(`Usuario conectado al chat: ${socket.id}`);
 
+    // Variables para almacenar el username y roomId del usuario
+    let currentRoomId: string | null = null;
+    let currentUsername: string | null = null;
+
     // Verificación JWT para el socket principal
     socket.use(([event, ...args], next) => {
         const token = socket.handshake.auth.token;
@@ -112,9 +116,20 @@ chatIO.on('connection', (socket) => {
     });
 
     // Manejar evento para unirse a una sala
-    socket.on('join_room', (roomId: string) => {
+    socket.on('join_room', (roomId: string, username: string) => {
         socket.join(roomId);
-        console.log(`Usuario con ID: ${socket.id} se unió a la sala: ${roomId}`);
+        currentRoomId = roomId;
+        currentUsername = username;
+        console.log(`Usuario con ID: ${socket.id} (${username}) se unió a la sala: ${roomId}`);
+
+        // Emitir mensaje a la sala notificando que un usuario se ha unido
+        const joinMessage = {
+            room: roomId,
+            author: 'System',
+            message: `${username} has joined the room.`,
+            time: new Date().toISOString()
+        };
+        socket.to(roomId).emit('receive_message', joinMessage);
     });
 
     // Manejar evento para enviar un mensaje
@@ -127,6 +142,15 @@ chatIO.on('connection', (socket) => {
     // Manejar desconexión
     socket.on('disconnect', () => {
         console.log(`Usuario desconectado del chat: ${socket.id}`);
+        if (currentRoomId && currentUsername) {
+            const leaveMessage = {
+                room: currentRoomId,
+                author: 'System',
+                message: `${currentUsername} has left the room.`,
+                time: new Date().toISOString()
+            };
+            socket.to(currentRoomId).emit('receive_message', leaveMessage);
+        }
     });
 });
 
