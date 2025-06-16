@@ -127,7 +127,8 @@ chatIO.on('connection', (socket) => {
             room: roomId,
             author: 'System',
             message: `${username} has joined the room.`,
-            time: new Date().toISOString()
+            time: new Date().toISOString(),
+            type: 'system' // <-- add this line
         };
         socket.to(roomId).emit('receive_message', joinMessage);
     });
@@ -135,8 +136,18 @@ chatIO.on('connection', (socket) => {
     // Manejar evento para enviar un mensaje
     socket.on('send_message', (data: ChatMessage) => {
         // Enviar el mensaje solo a los clientes en la misma sala
-        socket.to(data.room).emit('receive_message', data);
+        socket.to(data.room).emit('receive_message', {
+            ...data,
+            type: 'user' // <-- add this line
+        });
         console.log(`Mensaje enviado en sala ${data.room} por ${data.author}: ${data.message}`);
+    });
+
+    // Manejar evento de "usuario está escribiendo"
+    socket.on('typing', (roomId: string, author: string) => {
+        console.log(`${author} is typing in room ${roomId}`);
+        // Notificar a otros usuarios en la sala que este usuario está escribiendo
+        socket.to(roomId).emit('user_typing', { author });
     });
 
     // Manejar desconexión
@@ -147,7 +158,8 @@ chatIO.on('connection', (socket) => {
                 room: currentRoomId,
                 author: 'System',
                 message: `${currentUsername} has left the room.`,
-                time: new Date().toISOString()
+                time: new Date().toISOString(),
+                type: 'system' // <-- add this line
             };
             socket.to(currentRoomId).emit('receive_message', leaveMessage);
         }
